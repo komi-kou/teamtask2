@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, Download, MessageSquare, Search, Calendar, Plus, Users, Clock, Edit2, Trash2 } from 'lucide-react';
+import { FileText, MessageSquare, Search, Calendar, Plus, Users, Clock, Edit2, Trash2 } from 'lucide-react';
 import { LocalStorage, STORAGE_KEYS } from '../utils/storage';
 import './Documents.css';
 
@@ -82,25 +82,6 @@ const Documents: React.FC = () => {
     }
   }, []);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const newDoc: Document = {
-        id: Date.now(),
-        name: file.name,
-        type: file.type.includes('text') ? '文字起こし' : 'その他',
-        size: `${(file.size / 1024).toFixed(0)} KB`,
-        uploadDate: new Date().toISOString().split('T')[0],
-        uploadedBy: '現在のユーザー',
-        category: '未分類',
-        comments: []
-      };
-      const updatedDocs = [...documents, newDoc];
-      setDocuments(updatedDocs);
-      LocalStorage.set(STORAGE_KEYS.DOCUMENTS_DATA, updatedDocs);
-      // ファイルアップロードのシミュレーション（実際のアップロードは行わない）
-    }
-  };
 
   const addMeetingMinutes = () => {
     if (newMinutes.title && newMinutes.date && newMinutes.attendees && newMinutes.attendees.length > 0) {
@@ -346,11 +327,6 @@ const Documents: React.FC = () => {
             <Plus size={20} />
             議事録作成
           </button>
-          <label className="upload-button">
-            <Upload size={20} />
-            ファイルをアップロード
-            <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} />
-          </label>
         </div>
       </div>
 
@@ -382,12 +358,6 @@ const Documents: React.FC = () => {
                   )}
                 </div>
                 <div className="document-actions">
-                  <button className="download-btn" onClick={(e) => {
-                    e.stopPropagation();
-                    // ダウンロード機能（実際のファイルがないためシミュレーション）
-                  }} title="ダウンロード">
-                    <Download size={16} />
-                  </button>
                   {doc.type === '議事録' && (
                     <button 
                       className="edit-btn"

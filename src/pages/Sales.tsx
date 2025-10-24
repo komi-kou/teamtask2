@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, DollarSign, Users, Target, Download, Plus, Edit2, Trash2 } from 'lucide-react';
+import { TrendingUp, DollarSign, Users, Target, Plus, Edit2, Trash2 } from 'lucide-react';
 import { LocalStorage, STORAGE_KEYS } from '../utils/storage';
-import { DataExporter } from '../utils/export';
 import './Sales.css';
 
 interface Lead {
@@ -175,18 +174,6 @@ const Sales: React.FC = () => {
     }
   };
 
-  const exportLeadsToCSV = () => {
-    const exportData = leads.map(lead => ({
-      '会社名': lead.company,
-      '担当者': lead.contact,
-      'ステータス': lead.status,
-      '予想金額': lead.value,
-      '確度': `${lead.probability}%`,
-      '次のアクション': lead.nextAction,
-      '最終接触': lead.lastContact
-    }));
-    DataExporter.downloadCSV(exportData, `商談リスト_${new Date().toLocaleDateString('ja-JP')}.csv`);
-  };
 
   // 実際のデータに基づく計算
   const currentMonthRevenue = leads.reduce((sum, lead) => {
@@ -272,10 +259,6 @@ const Sales: React.FC = () => {
         <h1>👥 顧客管理</h1>
         <p className="sales-subtitle">顧客情報とサービス提案の管理</p>
         <div className="header-actions">
-          <button className="export-btn" onClick={exportLeadsToCSV}>
-            <Download size={20} />
-            CSVエクスポート
-          </button>
           <button className="add-lead-btn" onClick={() => setShowLeadModal(true)}>
             <Plus size={20} />
             新規顧客追加
