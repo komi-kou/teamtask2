@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Download, Search, Calendar, User, Star, Edit2, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, FileText, Download, Search, Calendar, User, Star, Upload, X, File as FileIcon, Edit2, Trash2 } from 'lucide-react';
 import { LocalStorage, STORAGE_KEYS } from '../utils/storage';
 import './ServiceMaterials.css';
 
@@ -44,6 +44,9 @@ const ServiceMaterials: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterFileType, setFilterFileType] = useState('all');
   const [filterServiceCategory, setFilterServiceCategory] = useState('all');
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const savedMaterials = LocalStorage.get<ServiceMaterial[]>(STORAGE_KEYS.SERVICE_MATERIALS);
@@ -55,6 +58,55 @@ const ServiceMaterials: React.FC = () => {
     }
   }, []);
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        setUploadedFile(file);
+        const fileSize = (file.size / 1024 / 1024).toFixed(2);
+        setNewMaterial({
+          ...newMaterial,
+          fileSize: `${fileSize} MB`,
+          fileName: file.name,
+          fileType: 'pdf'
+        });
+        
+        const reader = new FileReader();
+        reader.onloadstart = () => setUploadProgress(0);
+        reader.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setUploadProgress((e.loaded / e.total) * 100);
+          }
+        };
+        reader.onloadend = () => {
+          setUploadProgress(100);
+          setTimeout(() => setUploadProgress(0), 1000);
+        };
+        reader.onload = () => {
+          setNewMaterial(prev => ({
+            ...prev,
+            fileData: reader.result as string
+          }));
+        };
+        reader.readAsDataURL(file);
+      } else {
+        alert('PDFファイルのみアップロード可能です');
+      }
+    }
+  };
+
+  const removeUploadedFile = () => {
+    setUploadedFile(null);
+    setNewMaterial({
+      ...newMaterial,
+      fileData: undefined,
+      fileName: undefined,
+      fileSize: '0 KB'
+    });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const addMaterial = () => {
     if (newMaterial.title && newMaterial.description) {
@@ -80,8 +132,7 @@ const ServiceMaterials: React.FC = () => {
                 version: newMaterial.version || editingMaterial.version,
                 notes: newMaterial.notes || '',
                 createdAt: editingMaterial.createdAt,
-                // ファイルデータは保存しない（LocalStorageのサイズ制限回避）
-                fileData: undefined,
+                fileData: newMaterial.fileData || editingMaterial.fileData,
                 fileName: newMaterial.fileName || editingMaterial.fileName,
                 price: newMaterial.price,
                 deliveryTime: newMaterial.deliveryTime
@@ -107,8 +158,7 @@ const ServiceMaterials: React.FC = () => {
           version: newMaterial.version || '1.0',
           notes: newMaterial.notes || '',
           createdAt: new Date().toISOString(),
-          // ファイルデータは保存しない（LocalStorageのサイズ制限回避）
-          fileData: undefined,
+          fileData: newMaterial.fileData,
           fileName: newMaterial.fileName,
           price: newMaterial.price,
           deliveryTime: newMaterial.deliveryTime
@@ -118,15 +168,11 @@ const ServiceMaterials: React.FC = () => {
       
       console.log('資料を保存:', updatedMaterials.length, '件');
       setMaterials(updatedMaterials);
+      LocalStorage.set(STORAGE_KEYS.SERVICE_MATERIALS, updatedMaterials);
       
-      try {
-        LocalStorage.set(STORAGE_KEYS.SERVICE_MATERIALS, updatedMaterials);
-        // 保存確認
-        const saved = LocalStorage.get<ServiceMaterial[]>(STORAGE_KEYS.SERVICE_MATERIALS);
-        console.log('保存後の確認:', saved?.length, '件');
-      } catch (error) {
-        console.error('LocalStorage保存エラー:', error);
-      }
+      // 保存確認
+      const saved = LocalStorage.get<ServiceMaterial[]>(STORAGE_KEYS.SERVICE_MATERIALS);
+      console.log('保存後の確認:', saved?.length, '件');
       
     }
     
@@ -140,7 +186,11 @@ const ServiceMaterials: React.FC = () => {
       tags: [],
       createdAt: new Date().toISOString()
     });
+    setUploadedFile(null);
     setShowMaterialModal(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const addTag = () => {
@@ -188,15 +238,11 @@ const ServiceMaterials: React.FC = () => {
       const updatedMaterials = materials.filter(m => m.id !== materialId);
       console.log('資料を保存:', updatedMaterials.length, '件');
       setMaterials(updatedMaterials);
+      LocalStorage.set(STORAGE_KEYS.SERVICE_MATERIALS, updatedMaterials);
       
-      try {
-        LocalStorage.set(STORAGE_KEYS.SERVICE_MATERIALS, updatedMaterials);
-        // 保存確認
-        const saved = LocalStorage.get<ServiceMaterial[]>(STORAGE_KEYS.SERVICE_MATERIALS);
-        console.log('保存後の確認:', saved?.length, '件');
-      } catch (error) {
-        console.error('LocalStorage保存エラー:', error);
-      }
+      // 保存確認
+      const saved = LocalStorage.get<ServiceMaterial[]>(STORAGE_KEYS.SERVICE_MATERIALS);
+      console.log('保存後の確認:', saved?.length, '件');
     }
   };
 
@@ -214,6 +260,8 @@ const ServiceMaterials: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    } else {
+      alert(`${material.title} をダウンロード中...`);
     }
   };
 
@@ -473,6 +521,13 @@ const ServiceMaterials: React.FC = () => {
 
             <div className="material-actions">
               <button 
+                className="download-btn"
+                onClick={() => downloadMaterial(material)}
+              >
+                <Download size={16} />
+                ダウンロード
+              </button>
+              <button 
                 className="view-btn"
                 onClick={() => setSelectedMaterial(material)}
               >
@@ -587,6 +642,47 @@ const ServiceMaterials: React.FC = () => {
                   onChange={(e) => setNewMaterial({ ...newMaterial, version: e.target.value })}
                   placeholder="1.0"
                 />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>PDFファイルアップロード</label>
+              <div className="file-upload-section">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,application/pdf"
+                  onChange={handleFileUpload}
+                  style={{ display: 'none' }}
+                  id="pdf-upload"
+                />
+                {!uploadedFile ? (
+                  <label htmlFor="pdf-upload" className="upload-area">
+                    <Upload size={32} />
+                    <p>PDFファイルをドラッグ&ドロップ</p>
+                    <p>または</p>
+                    <button type="button" className="browse-btn">ファイルを選択</button>
+                  </label>
+                ) : (
+                  <div className="uploaded-file">
+                    <FileIcon size={32} />
+                    <div className="file-info">
+                      <p>{uploadedFile.name}</p>
+                      <p className="file-size">{newMaterial.fileSize}</p>
+                    </div>
+                    <button 
+                      type="button" 
+                      className="remove-file-btn"
+                      onClick={removeUploadedFile}
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                )}
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <div className="upload-progress">
+                    <div className="progress-bar" style={{ width: `${uploadProgress}%` }}></div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="form-row">
@@ -734,6 +830,10 @@ const ServiceMaterials: React.FC = () => {
               )}
             </div>
             <div className="modal-actions">
+              <button className="download-btn" onClick={() => downloadMaterial(selectedMaterial)}>
+                <Download size={16} />
+                ダウンロード
+              </button>
               <button className="cancel-btn" onClick={() => setSelectedMaterial(null)}>閉じる</button>
             </div>
           </div>
