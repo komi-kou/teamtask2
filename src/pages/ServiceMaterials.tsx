@@ -100,7 +100,7 @@ const ServiceMaterials: React.FC = () => {
           fileType: newMaterial.fileType as ServiceMaterial['fileType'],
           fileSize: newMaterial.fileSize || '0 KB',
           uploadDate: new Date().toISOString().split('T')[0],
-          uploadedBy: newMaterial.uploadedBy || '現在のユーザー',
+          uploadedBy: newMaterial.uploadedBy || '',
           tags: newMaterial.tags || [],
           downloadCount: newMaterial.downloadCount || 0,
           isPublic: newMaterial.isPublic || true,
@@ -610,7 +610,7 @@ const ServiceMaterials: React.FC = () => {
               </div>
             </div>
             <div className="form-group">
-              <label>アップロード者</label>
+              <label>担当者</label>
               <input
                 type="text"
                 value={newMaterial.uploadedBy || ''}
@@ -693,8 +693,8 @@ const ServiceMaterials: React.FC = () => {
                 <p><strong>ファイル形式:</strong> {getFileTypeIcon(selectedMaterial.fileType)} {selectedMaterial.fileType.toUpperCase()}</p>
                 <p><strong>ファイルサイズ:</strong> {selectedMaterial.fileSize}</p>
                 <p><strong>バージョン:</strong> v{selectedMaterial.version}</p>
-                <p><strong>アップロード者:</strong> {selectedMaterial.uploadedBy}</p>
-                <p><strong>アップロード日:</strong> {selectedMaterial.uploadDate}</p>
+                <p><strong>担当者:</strong> {selectedMaterial.uploadedBy}</p>
+                <p><strong>登録日:</strong> {selectedMaterial.uploadDate}</p>
                 <p><strong>ダウンロード数:</strong> {selectedMaterial.downloadCount}回</p>
                 <p><strong>公開設定:</strong> {selectedMaterial.isPublic ? '公開' : '非公開'}</p>
                 {selectedMaterial.serviceCategory && (
