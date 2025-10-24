@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, Download, MessageSquare, Search, Calendar, Plus, Users, Clock } from 'lucide-react';
+import { Upload, FileText, Download, MessageSquare, Search, Calendar, Plus, Users, Clock, Edit2, Trash2 } from 'lucide-react';
 import { LocalStorage, STORAGE_KEYS } from '../utils/storage';
 import './Documents.css';
 
@@ -53,6 +53,7 @@ const Documents: React.FC = () => {
   const [teamMembers, setTeamMembers] = useState<{id: number, name: string, role: string}[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [showMinutesModal, setShowMinutesModal] = useState(false);
+  const [editingMinutes, setEditingMinutes] = useState<MeetingMinutes | null>(null);
   const [newMinutes, setNewMinutes] = useState<Partial<MeetingMinutes>>({
     attendees: [],
     agenda: [],
@@ -97,47 +98,92 @@ const Documents: React.FC = () => {
       const updatedDocs = [...documents, newDoc];
       setDocuments(updatedDocs);
       LocalStorage.set(STORAGE_KEYS.DOCUMENTS_DATA, updatedDocs);
-      alert(`${file.name} がアップロードされました`);
+      // ファイルアップロードのシミュレーション（実際のアップロードは行わない）
     }
   };
 
   const addMeetingMinutes = () => {
     if (newMinutes.title && newMinutes.date && newMinutes.attendees && newMinutes.attendees.length > 0) {
-      const minutes: MeetingMinutes = {
-        id: Date.now(),
-        title: newMinutes.title,
-        date: newMinutes.date,
-        time: newMinutes.time || '',
-        attendees: newMinutes.attendees,
-        meetingLink: newMinutes.meetingLink,
-        meetingType: newMinutes.meetingType || 'zoom',
-        agenda: newMinutes.agenda || [],
-        decisions: newMinutes.decisions || [],
-        actionItems: newMinutes.actionItems || [],
-        notes: newMinutes.notes || '',
-        status: newMinutes.status || 'scheduled'
-      };
+      let updatedMinutes;
+      let updatedDocs;
       
-      const updatedMinutes = [...meetingMinutes, minutes];
+      if (editingMinutes) {
+        // 編集モード
+        const minutes: MeetingMinutes = {
+          ...editingMinutes,
+          title: newMinutes.title,
+          date: newMinutes.date,
+          time: newMinutes.time || '',
+          attendees: newMinutes.attendees,
+          meetingLink: newMinutes.meetingLink,
+          meetingType: newMinutes.meetingType || 'zoom',
+          agenda: newMinutes.agenda || [],
+          decisions: newMinutes.decisions || [],
+          actionItems: newMinutes.actionItems || [],
+          notes: newMinutes.notes || '',
+          status: newMinutes.status || 'scheduled'
+        };
+        
+        updatedMinutes = meetingMinutes.map(m => 
+          m.id === editingMinutes.id ? minutes : m
+        );
+        
+        // 対応するドキュメントも更新
+        const docName = `${minutes.title}_議事録`;
+        updatedDocs = documents.map(doc => 
+          doc.name === `${editingMinutes.title}_議事録` 
+            ? {
+                ...doc,
+                name: docName,
+                uploadDate: minutes.date,
+                meetingDate: minutes.date,
+                attendees: minutes.attendees,
+                actionItems: minutes.actionItems
+              }
+            : doc
+        );
+        
+        setEditingMinutes(null);
+      } else {
+        // 新規追加モード
+        const minutes: MeetingMinutes = {
+          id: Date.now(),
+          title: newMinutes.title,
+          date: newMinutes.date,
+          time: newMinutes.time || '',
+          attendees: newMinutes.attendees,
+          meetingLink: newMinutes.meetingLink,
+          meetingType: newMinutes.meetingType || 'zoom',
+          agenda: newMinutes.agenda || [],
+          decisions: newMinutes.decisions || [],
+          actionItems: newMinutes.actionItems || [],
+          notes: newMinutes.notes || '',
+          status: newMinutes.status || 'scheduled'
+        };
+        
+        updatedMinutes = [...meetingMinutes, minutes];
+        
+        // ドキュメントとしても追加
+        const doc: Document = {
+          id: Date.now(),
+          name: `${minutes.title}_議事録`,
+          type: '議事録',
+          size: '1.2 KB',
+          uploadDate: minutes.date,
+          uploadedBy: 'システム',
+          category: '会議',
+          comments: [],
+          meetingDate: minutes.date,
+          attendees: minutes.attendees,
+          actionItems: minutes.actionItems
+        };
+        
+        updatedDocs = [...documents, doc];
+      }
+      
       setMeetingMinutes(updatedMinutes);
       LocalStorage.set(STORAGE_KEYS.MEETING_MINUTES, updatedMinutes);
       
-      // ドキュメントとしても追加
-      const doc: Document = {
-        id: Date.now(),
-        name: `${minutes.title}_議事録`,
-        type: '議事録',
-        size: '1.2 KB',
-        uploadDate: minutes.date,
-        uploadedBy: 'システム',
-        category: '会議',
-        comments: [],
-        meetingDate: minutes.date,
-        attendees: minutes.attendees,
-        actionItems: minutes.actionItems
-      };
-      
-      const updatedDocs = [...documents, doc];
       setDocuments(updatedDocs);
       LocalStorage.set(STORAGE_KEYS.DOCUMENTS_DATA, updatedDocs);
       
@@ -214,8 +260,52 @@ const Documents: React.FC = () => {
         return doc;
       });
       setDocuments(updatedDocs);
+      LocalStorage.set(STORAGE_KEYS.DOCUMENTS_DATA, updatedDocs);
       setSelectedDoc(updatedDocs.find(d => d.id === selectedDoc.id) || null);
       setNewComment('');
+    }
+  };
+
+  const editMeetingMinutes = (docName: string) => {
+    const minutesTitle = docName.replace('_議事録', '');
+    const minutes = meetingMinutes.find(m => m.title === minutesTitle);
+    if (minutes) {
+      setEditingMinutes(minutes);
+      setNewMinutes({
+        title: minutes.title,
+        date: minutes.date,
+        time: minutes.time,
+        attendees: minutes.attendees,
+        meetingLink: minutes.meetingLink,
+        meetingType: minutes.meetingType,
+        agenda: minutes.agenda,
+        decisions: minutes.decisions,
+        actionItems: minutes.actionItems,
+        notes: minutes.notes,
+        status: minutes.status
+      });
+      setShowMinutesModal(true);
+    }
+  };
+
+  const deleteDocument = (docId: number) => {
+    const doc = documents.find(d => d.id === docId);
+    if (doc && window.confirm(`「${doc.name}」を削除してもよろしいですか？`)) {
+      const updatedDocs = documents.filter(d => d.id !== docId);
+      setDocuments(updatedDocs);
+      LocalStorage.set(STORAGE_KEYS.DOCUMENTS_DATA, updatedDocs);
+      
+      // 議事録の場合は会議録も削除
+      if (doc.type === '議事録') {
+        const minutesTitle = doc.name.replace('_議事録', '');
+        const updatedMinutes = meetingMinutes.filter(m => m.title !== minutesTitle);
+        setMeetingMinutes(updatedMinutes);
+        LocalStorage.set(STORAGE_KEYS.MEETING_MINUTES, updatedMinutes);
+      }
+      
+      if (selectedDoc?.id === docId) {
+        setSelectedDoc(null);
+      }
     }
   };
 
@@ -291,12 +381,36 @@ const Documents: React.FC = () => {
                     </p>
                   )}
                 </div>
-                <button className="download-btn" onClick={(e) => {
-                  e.stopPropagation();
-                  alert(`${doc.name} をダウンロード中...`);
-                }}>
-                  <Download size={18} />
-                </button>
+                <div className="document-actions">
+                  <button className="download-btn" onClick={(e) => {
+                    e.stopPropagation();
+                    // ダウンロード機能（実際のファイルがないためシミュレーション）
+                  }} title="ダウンロード">
+                    <Download size={16} />
+                  </button>
+                  {doc.type === '議事録' && (
+                    <button 
+                      className="edit-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        editMeetingMinutes(doc.name);
+                      }}
+                      title="編集"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  )}
+                  <button 
+                    className="delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteDocument(doc.id);
+                    }}
+                    title="削除"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -349,9 +463,20 @@ const Documents: React.FC = () => {
       </div>
 
       {showMinutesModal && (
-        <div className="modal-overlay" onClick={() => setShowMinutesModal(false)}>
+        <div className="modal-overlay" onClick={() => {
+          setShowMinutesModal(false);
+          setEditingMinutes(null);
+          setNewMinutes({ 
+            attendees: [], 
+            agenda: [], 
+            decisions: [], 
+            actionItems: [],
+            meetingType: 'zoom',
+            status: 'scheduled'
+          });
+        }}>
           <div className="modal-content minutes-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>議事録作成</h2>
+            <h2>{editingMinutes ? '議事録編集' : '議事録作成'}</h2>
             <div className="form-group">
               <label>会議名</label>
               <input
@@ -476,8 +601,21 @@ const Documents: React.FC = () => {
             </div>
             
             <div className="modal-actions">
-              <button className="cancel-btn" onClick={() => setShowMinutesModal(false)}>キャンセル</button>
-              <button className="save-btn" onClick={addMeetingMinutes}>議事録を作成</button>
+              <button className="cancel-btn" onClick={() => {
+                setShowMinutesModal(false);
+                setEditingMinutes(null);
+                setNewMinutes({ 
+                  attendees: [], 
+                  agenda: [], 
+                  decisions: [], 
+                  actionItems: [],
+                  meetingType: 'zoom',
+                  status: 'scheduled'
+                });
+              }}>キャンセル</button>
+              <button className="save-btn" onClick={addMeetingMinutes}>
+                {editingMinutes ? '議事録を更新' : '議事録を作成'}
+              </button>
             </div>
           </div>
         </div>

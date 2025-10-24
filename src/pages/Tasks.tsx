@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Clock, CheckCircle, AlertCircle, User, Calendar, Link, FileText } from 'lucide-react';
+import { Plus, Clock, CheckCircle, AlertCircle, User, Calendar, Link, FileText, Edit2, Trash2 } from 'lucide-react';
 import { LocalStorage, STORAGE_KEYS } from '../utils/storage';
 import './Tasks.css';
 
@@ -29,6 +29,7 @@ const Tasks: React.FC = () => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showTaskDetail, setShowTaskDetail] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [newTask, setNewTask] = useState<Partial<Task>>({
     status: 'pending',
     priority: 'medium',
@@ -74,20 +75,45 @@ const Tasks: React.FC = () => {
 
   const addTask = () => {
     if (newTask.title && newTask.assignee && newTask.dueDate) {
-      const task: Task = {
-        id: Date.now(),
-        title: newTask.title,
-        description: newTask.description || '',
-        status: newTask.status as Task['status'],
-        priority: newTask.priority as Task['priority'],
-        assignee: newTask.assignee,
-        dueDate: newTask.dueDate,
-        meetingLink: newTask.meetingLink,
-        notes: newTask.notes,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      const updatedTasks = [...tasks, task];
+      let updatedTasks;
+      
+      if (editingTask) {
+        // 編集モード
+        updatedTasks = tasks.map(task => 
+          task.id === editingTask.id 
+            ? {
+                ...editingTask,
+                title: newTask.title,
+                description: newTask.description || '',
+                status: newTask.status as Task['status'],
+                priority: newTask.priority as Task['priority'],
+                assignee: newTask.assignee,
+                dueDate: newTask.dueDate,
+                meetingLink: newTask.meetingLink,
+                notes: newTask.notes,
+                updatedAt: new Date().toISOString()
+              }
+            : task
+        );
+        setEditingTask(null);
+      } else {
+        // 新規追加モード
+        const task: Task = {
+          id: Date.now(),
+          title: newTask.title,
+          description: newTask.description || '',
+          status: newTask.status as Task['status'],
+          priority: newTask.priority as Task['priority'],
+          assignee: newTask.assignee,
+          dueDate: newTask.dueDate,
+          meetingLink: newTask.meetingLink,
+          notes: newTask.notes,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        updatedTasks = [...tasks, task];
+      }
+      
       setTasks(updatedTasks);
       LocalStorage.set(STORAGE_KEYS.TASKS_DATA, updatedTasks);
       setNewTask({ status: 'pending', priority: 'medium', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
@@ -104,10 +130,30 @@ const Tasks: React.FC = () => {
   };
 
   const deleteTask = (taskId: number) => {
-    const updatedTasks = tasks.filter(task => task.id !== taskId);
-    setTasks(updatedTasks);
-    LocalStorage.set(STORAGE_KEYS.TASKS_DATA, updatedTasks);
-    setShowTaskDetail(null);
+    const task = tasks.find(t => t.id === taskId);
+    if (task && window.confirm(`「${task.title}」のタスクを削除してもよろしいですか？`)) {
+      const updatedTasks = tasks.filter(task => task.id !== taskId);
+      setTasks(updatedTasks);
+      LocalStorage.set(STORAGE_KEYS.TASKS_DATA, updatedTasks);
+      setShowTaskDetail(null);
+    }
+  };
+
+  const editTask = (task: Task) => {
+    setEditingTask(task);
+    setNewTask({
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      assignee: task.assignee,
+      dueDate: task.dueDate,
+      meetingLink: task.meetingLink,
+      notes: task.notes,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt
+    });
+    setShowAddTask(true);
   };
 
   return (
@@ -234,6 +280,20 @@ const Tasks: React.FC = () => {
                       {column.key !== 'completed' && (
                         <button onClick={() => moveTask(task.id, 'completed')}>完了へ</button>
                       )}
+                      <button 
+                        className="edit-btn"
+                        onClick={() => editTask(task)}
+                        title="編集"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button 
+                        className="delete-btn"
+                        onClick={() => deleteTask(task.id)}
+                        title="削除"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -243,9 +303,13 @@ const Tasks: React.FC = () => {
       </div>
 
       {showAddTask && (
-        <div className="modal-overlay" onClick={() => setShowAddTask(false)}>
+        <div className="modal-overlay" onClick={() => {
+          setShowAddTask(false);
+          setEditingTask(null);
+          setNewTask({ status: 'pending', priority: 'medium', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+        }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>新規タスク追加</h2>
+            <h2>{editingTask ? 'タスク編集' : '新規タスク追加'}</h2>
             <div className="form-group">
               <label>タイトル</label>
               <input
@@ -314,8 +378,14 @@ const Tasks: React.FC = () => {
               </div>
             </div>
             <div className="modal-actions">
-              <button className="cancel-btn" onClick={() => setShowAddTask(false)}>キャンセル</button>
-              <button className="save-btn" onClick={addTask}>追加</button>
+              <button className="cancel-btn" onClick={() => {
+                setShowAddTask(false);
+                setEditingTask(null);
+                setNewTask({ status: 'pending', priority: 'medium', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+              }}>キャンセル</button>
+              <button className="save-btn" onClick={addTask}>
+                {editingTask ? 'タスクを更新' : 'タスクを追加'}
+              </button>
             </div>
           </div>
         </div>
@@ -380,6 +450,15 @@ const Tasks: React.FC = () => {
               </div>
             </div>
             <div className="modal-actions">
+              <button 
+                className="edit-btn"
+                onClick={() => {
+                  editTask(showTaskDetail);
+                  setShowTaskDetail(null);
+                }}
+              >
+                編集
+              </button>
               <button className="delete-btn" onClick={() => deleteTask(showTaskDetail.id)}>削除</button>
               <button className="cancel-btn" onClick={() => setShowTaskDetail(null)}>閉じる</button>
             </div>

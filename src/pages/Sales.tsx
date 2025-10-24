@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, DollarSign, Users, Target, Download, Plus } from 'lucide-react';
+import { TrendingUp, DollarSign, Users, Target, Download, Plus, Edit2, Trash2 } from 'lucide-react';
 import { LocalStorage, STORAGE_KEYS } from '../utils/storage';
 import { DataExporter } from '../utils/export';
 import './Sales.css';
@@ -38,6 +38,7 @@ const Sales: React.FC = () => {
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [newLead, setNewLead] = useState<Partial<Lead>>({ 
     probability: 50, 
     services: [], 
@@ -59,25 +60,53 @@ const Sales: React.FC = () => {
 
   const addLead = () => {
     if (newLead.company && newLead.contact && newLead.value) {
-      const lead: Lead = {
-        id: Date.now(),
-        company: newLead.company,
-        contact: newLead.contact,
-        contactEmail: newLead.contactEmail || '',
-        contactPhone: newLead.contactPhone || '',
-        companyUrl: newLead.companyUrl || '',
-        status: newLead.status || 'リード',
-        value: newLead.value,
-        probability: newLead.probability || 50,
-        nextAction: newLead.nextAction || '',
-        lastContact: new Date().toISOString().split('T')[0],
-        meetingDate: newLead.meetingDate,
-        meetingLink: newLead.meetingLink,
-        services: newLead.services || [],
-        notes: newLead.notes || '',
-        createdAt: new Date().toISOString()
-      };
-      const updatedLeads = [...leads, lead];
+      let updatedLeads;
+      
+      if (editingLead) {
+        // 編集モード
+        updatedLeads = leads.map(lead => 
+          lead.id === editingLead.id 
+            ? {
+                ...editingLead,
+                company: newLead.company,
+                contact: newLead.contact,
+                contactEmail: newLead.contactEmail || '',
+                contactPhone: newLead.contactPhone || '',
+                companyUrl: newLead.companyUrl || '',
+                status: newLead.status || 'リード',
+                value: newLead.value,
+                probability: newLead.probability || 50,
+                nextAction: newLead.nextAction || '',
+                meetingDate: newLead.meetingDate,
+                meetingLink: newLead.meetingLink,
+                notes: newLead.notes || ''
+              }
+            : lead
+        );
+        setEditingLead(null);
+      } else {
+        // 新規追加モード
+        const lead: Lead = {
+          id: Date.now(),
+          company: newLead.company,
+          contact: newLead.contact,
+          contactEmail: newLead.contactEmail || '',
+          contactPhone: newLead.contactPhone || '',
+          companyUrl: newLead.companyUrl || '',
+          status: newLead.status || 'リード',
+          value: newLead.value,
+          probability: newLead.probability || 50,
+          nextAction: newLead.nextAction || '',
+          lastContact: new Date().toISOString().split('T')[0],
+          meetingDate: newLead.meetingDate,
+          meetingLink: newLead.meetingLink,
+          services: newLead.services || [],
+          notes: newLead.notes || '',
+          createdAt: new Date().toISOString()
+        };
+        updatedLeads = [...leads, lead];
+      }
+      
       setLeads(updatedLeads);
       LocalStorage.set(STORAGE_KEYS.LEADS_DATA, updatedLeads);
       setNewLead({ 
@@ -113,6 +142,36 @@ const Sales: React.FC = () => {
       setSelectedLead({ ...selectedLead, services: [...selectedLead.services, service] });
       setNewService({ status: 'proposed', category: 'other' });
       setShowServiceModal(false);
+    }
+  };
+
+  const editLead = (lead: Lead) => {
+    setEditingLead(lead);
+    setNewLead({
+      company: lead.company,
+      contact: lead.contact,
+      contactEmail: lead.contactEmail,
+      contactPhone: lead.contactPhone,
+      companyUrl: lead.companyUrl,
+      status: lead.status,
+      value: lead.value,
+      probability: lead.probability,
+      nextAction: lead.nextAction,
+      meetingDate: lead.meetingDate,
+      meetingLink: lead.meetingLink,
+      notes: lead.notes,
+      services: lead.services,
+      createdAt: lead.createdAt
+    });
+    setShowLeadModal(true);
+  };
+
+  const deleteLead = (leadId: number) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (lead && window.confirm(`「${lead.company}」の顧客情報を削除してもよろしいですか？`)) {
+      const updatedLeads = leads.filter(l => l.id !== leadId);
+      setLeads(updatedLeads);
+      LocalStorage.set(STORAGE_KEYS.LEADS_DATA, updatedLeads);
     }
   };
 
@@ -461,15 +520,31 @@ const Sales: React.FC = () => {
                     </div>
                   </td>
                   <td>
-                    <button 
-                      className="action-btn"
-                      onClick={() => {
-                        setSelectedLead(lead);
-                        setShowServiceModal(true);
-                      }}
-                    >
-                      サービス追加
-                    </button>
+                    <div className="action-buttons">
+                      <button 
+                        className="action-btn"
+                        onClick={() => {
+                          setSelectedLead(lead);
+                          setShowServiceModal(true);
+                        }}
+                      >
+                        サービス追加
+                      </button>
+                      <button 
+                        className="edit-btn"
+                        onClick={() => editLead(lead)}
+                        title="編集"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button 
+                        className="delete-btn"
+                        onClick={() => deleteLead(lead.id)}
+                        title="削除"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -479,9 +554,18 @@ const Sales: React.FC = () => {
       </div>
 
       {showLeadModal && (
-        <div className="modal-overlay" onClick={() => setShowLeadModal(false)}>
+        <div className="modal-overlay" onClick={() => {
+          setShowLeadModal(false);
+          setEditingLead(null);
+          setNewLead({ 
+            probability: 50, 
+            services: [], 
+            notes: '',
+            createdAt: new Date().toISOString()
+          });
+        }}>
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>新規顧客追加</h2>
+            <h2>{editingLead ? '顧客情報編集' : '新規顧客追加'}</h2>
             <div className="form-row">
               <div className="form-group">
                 <label>会社名 *</label>
@@ -605,8 +689,19 @@ const Sales: React.FC = () => {
               />
             </div>
             <div className="modal-actions">
-              <button className="cancel-btn" onClick={() => setShowLeadModal(false)}>キャンセル</button>
-              <button className="save-btn" onClick={addLead}>顧客を追加</button>
+              <button className="cancel-btn" onClick={() => {
+                setShowLeadModal(false);
+                setEditingLead(null);
+                setNewLead({ 
+                  probability: 50, 
+                  services: [], 
+                  notes: '',
+                  createdAt: new Date().toISOString()
+                });
+              }}>キャンセル</button>
+              <button className="save-btn" onClick={addLead}>
+                {editingLead ? '顧客情報を更新' : '顧客を追加'}
+              </button>
             </div>
           </div>
         </div>

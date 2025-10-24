@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, FileText, Download, Search, Calendar, User, Star, Upload, X, File as FileIcon, Edit2, Trash2 } from 'lucide-react';
+import { Plus, FileText, Download, Search, Calendar, User, Eye, Star, Upload, X, File as FileIcon } from 'lucide-react';
 import { LocalStorage, STORAGE_KEYS } from '../utils/storage';
 import './ServiceMaterials.css';
 
@@ -51,10 +51,7 @@ const ServiceMaterials: React.FC = () => {
   useEffect(() => {
     const savedMaterials = LocalStorage.get<ServiceMaterial[]>(STORAGE_KEYS.SERVICE_MATERIALS);
     if (savedMaterials && savedMaterials.length > 0) {
-      console.log('既存のサービス資料を読み込み:', savedMaterials.length, '件');
       setMaterials(savedMaterials);
-    } else {
-      console.log('保存されたサービス資料なし');
     }
   }, []);
 
@@ -89,6 +86,8 @@ const ServiceMaterials: React.FC = () => {
           }));
         };
         reader.readAsDataURL(file);
+      } else {
+        alert('PDFファイルのみアップロード可能です');
       }
     }
   };
@@ -108,86 +107,47 @@ const ServiceMaterials: React.FC = () => {
 
   const addMaterial = () => {
     if (newMaterial.title && newMaterial.description) {
-      let updatedMaterials;
+      const material: ServiceMaterial = {
+        id: Date.now(),
+        title: newMaterial.title,
+        description: newMaterial.description,
+        category: newMaterial.category as ServiceMaterial['category'],
+        serviceCategory: newMaterial.serviceCategory as ServiceMaterial['serviceCategory'],
+        fileType: newMaterial.fileType as ServiceMaterial['fileType'],
+        fileSize: newMaterial.fileSize || '0 KB',
+        uploadDate: new Date().toISOString().split('T')[0],
+        uploadedBy: newMaterial.uploadedBy || '現在のユーザー',
+        tags: newMaterial.tags || [],
+        downloadCount: newMaterial.downloadCount || 0,
+        isPublic: newMaterial.isPublic || true,
+        version: newMaterial.version || '1.0',
+        notes: newMaterial.notes || '',
+        createdAt: new Date().toISOString(),
+        fileData: newMaterial.fileData,
+        fileName: newMaterial.fileName,
+        price: newMaterial.price,
+        deliveryTime: newMaterial.deliveryTime
+      };
       
-      if (editingMaterial) {
-        // 編集モード
-        updatedMaterials = materials.map(m => 
-          m.id === editingMaterial.id 
-            ? {
-                ...editingMaterial,
-                title: newMaterial.title,
-                description: newMaterial.description,
-                category: newMaterial.category as ServiceMaterial['category'],
-                serviceCategory: newMaterial.serviceCategory as ServiceMaterial['serviceCategory'],
-                fileType: newMaterial.fileType as ServiceMaterial['fileType'],
-                fileSize: newMaterial.fileSize || editingMaterial.fileSize,
-                uploadDate: editingMaterial.uploadDate,
-                uploadedBy: newMaterial.uploadedBy || editingMaterial.uploadedBy,
-                tags: newMaterial.tags || [],
-                downloadCount: editingMaterial.downloadCount,
-                isPublic: newMaterial.isPublic || true,
-                version: newMaterial.version || editingMaterial.version,
-                notes: newMaterial.notes || '',
-                createdAt: editingMaterial.createdAt,
-                fileData: newMaterial.fileData || editingMaterial.fileData,
-                fileName: newMaterial.fileName || editingMaterial.fileName,
-                price: newMaterial.price,
-                deliveryTime: newMaterial.deliveryTime
-              }
-            : m
-        );
-        setEditingMaterial(null);
-      } else {
-        // 新規追加モード
-        const material: ServiceMaterial = {
-          id: Date.now(),
-          title: newMaterial.title,
-          description: newMaterial.description,
-          category: newMaterial.category as ServiceMaterial['category'],
-          serviceCategory: newMaterial.serviceCategory as ServiceMaterial['serviceCategory'],
-          fileType: newMaterial.fileType as ServiceMaterial['fileType'],
-          fileSize: newMaterial.fileSize || '0 KB',
-          uploadDate: new Date().toISOString().split('T')[0],
-          uploadedBy: newMaterial.uploadedBy || '現在のユーザー',
-          tags: newMaterial.tags || [],
-          downloadCount: newMaterial.downloadCount || 0,
-          isPublic: newMaterial.isPublic || true,
-          version: newMaterial.version || '1.0',
-          notes: newMaterial.notes || '',
-          createdAt: new Date().toISOString(),
-          fileData: newMaterial.fileData,
-          fileName: newMaterial.fileName,
-          price: newMaterial.price,
-          deliveryTime: newMaterial.deliveryTime
-        };
-        updatedMaterials = [...materials, material];
-      }
-      
-      console.log('資料を保存:', updatedMaterials.length, '件');
+      const updatedMaterials = [...materials, material];
       setMaterials(updatedMaterials);
       LocalStorage.set(STORAGE_KEYS.SERVICE_MATERIALS, updatedMaterials);
       
-      // 保存確認
-      const saved = LocalStorage.get<ServiceMaterial[]>(STORAGE_KEYS.SERVICE_MATERIALS);
-      console.log('保存後の確認:', saved?.length, '件');
-      
-    }
-    
-    setNewMaterial({
-      category: 'proposal',
-      serviceCategory: 'other',
-      fileType: 'pdf',
-      isPublic: true,
-      version: '1.0',
-      downloadCount: 0,
-      tags: [],
-      createdAt: new Date().toISOString()
-    });
-    setUploadedFile(null);
-    setShowMaterialModal(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      setNewMaterial({
+        category: 'proposal',
+        serviceCategory: 'other',
+        fileType: 'pdf',
+        isPublic: true,
+        version: '1.0',
+        downloadCount: 0,
+        tags: [],
+        createdAt: new Date().toISOString()
+      });
+      setUploadedFile(null);
+      setShowMaterialModal(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -208,42 +168,6 @@ const ServiceMaterials: React.FC = () => {
     });
   };
 
-  const editMaterial = (material: ServiceMaterial) => {
-    setEditingMaterial(material);
-    setNewMaterial({
-      title: material.title,
-      description: material.description,
-      category: material.category,
-      serviceCategory: material.serviceCategory,
-      fileType: material.fileType,
-      fileSize: material.fileSize,
-      uploadedBy: material.uploadedBy,
-      tags: material.tags,
-      isPublic: material.isPublic,
-      version: material.version,
-      notes: material.notes,
-      fileData: material.fileData,
-      fileName: material.fileName,
-      price: material.price,
-      deliveryTime: material.deliveryTime
-    });
-    setShowMaterialModal(true);
-  };
-
-  const deleteMaterial = (materialId: number) => {
-    const material = materials.find(m => m.id === materialId);
-    if (material && window.confirm(`「${material.title}」を削除してもよろしいですか？`)) {
-      const updatedMaterials = materials.filter(m => m.id !== materialId);
-      console.log('資料を保存:', updatedMaterials.length, '件');
-      setMaterials(updatedMaterials);
-      LocalStorage.set(STORAGE_KEYS.SERVICE_MATERIALS, updatedMaterials);
-      
-      // 保存確認
-      const saved = LocalStorage.get<ServiceMaterial[]>(STORAGE_KEYS.SERVICE_MATERIALS);
-      console.log('保存後の確認:', saved?.length, '件');
-    }
-  };
-
   const downloadMaterial = (material: ServiceMaterial) => {
     const updatedMaterials = materials.map(m => 
       m.id === material.id ? { ...m, downloadCount: m.downloadCount + 1 } : m
@@ -258,9 +182,23 @@ const ServiceMaterials: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    } else {
+      alert(`${material.title} をダウンロード中...`);
     }
   };
 
+  const viewPDF = (material: ServiceMaterial) => {
+    if (material.fileData) {
+      const newWindow = window.open();
+      if (newWindow) {
+        newWindow.document.write(
+          `<iframe src="${material.fileData}" style="width:100%; height:100vh; border:none;"></iframe>`
+        );
+      }
+    } else {
+      alert('PDFファイルが見つかりません');
+    }
+  };
 
   const getCategoryColor = (category: string) => {
     switch (category) {
@@ -523,6 +461,15 @@ const ServiceMaterials: React.FC = () => {
                 <Download size={16} />
                 ダウンロード
               </button>
+              {material.fileType === 'pdf' && material.fileData && (
+                <button 
+                  className="view-btn"
+                  onClick={() => viewPDF(material)}
+                >
+                  <Eye size={16} />
+                  プレビュー
+                </button>
+              )}
               <button 
                 className="view-btn"
                 onClick={() => setSelectedMaterial(material)}
@@ -530,42 +477,15 @@ const ServiceMaterials: React.FC = () => {
                 <FileText size={16} />
                 詳細
               </button>
-              <button 
-                className="edit-btn"
-                onClick={() => editMaterial(material)}
-                title="編集"
-              >
-                <Edit2 size={16} />
-              </button>
-              <button 
-                className="delete-btn"
-                onClick={() => deleteMaterial(material.id)}
-                title="削除"
-              >
-                <Trash2 size={16} />
-              </button>
             </div>
           </div>
         ))}
       </div>
 
       {showMaterialModal && (
-        <div className="modal-overlay" onClick={() => {
-          setShowMaterialModal(false);
-          setEditingMaterial(null);
-          setNewMaterial({
-            category: 'proposal',
-            serviceCategory: 'other',
-            fileType: 'pdf',
-            isPublic: true,
-            version: '1.0',
-            downloadCount: 0,
-            tags: [],
-            createdAt: new Date().toISOString()
-          });
-        }}>
+        <div className="modal-overlay" onClick={() => setShowMaterialModal(false)}>
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>{editingMaterial ? 'サービス資料編集' : 'サービス資料追加'}</h2>
+            <h2>サービス資料追加</h2>
             <div className="form-group">
               <label>資料名 *</label>
               <input
@@ -747,23 +667,8 @@ const ServiceMaterials: React.FC = () => {
               />
             </div>
             <div className="modal-actions">
-              <button className="cancel-btn" onClick={() => {
-                setShowMaterialModal(false);
-                setEditingMaterial(null);
-                setNewMaterial({
-                  category: 'proposal',
-                  serviceCategory: 'other',
-                  fileType: 'pdf',
-                  isPublic: true,
-                  version: '1.0',
-                  downloadCount: 0,
-                  tags: [],
-                  createdAt: new Date().toISOString()
-                });
-              }}>キャンセル</button>
-              <button className="save-btn" onClick={addMaterial}>
-                {editingMaterial ? '資料を更新' : '資料を追加'}
-              </button>
+              <button className="cancel-btn" onClick={() => setShowMaterialModal(false)}>キャンセル</button>
+              <button className="save-btn" onClick={addMaterial}>資料を追加</button>
             </div>
           </div>
         </div>
@@ -830,6 +735,12 @@ const ServiceMaterials: React.FC = () => {
                 <Download size={16} />
                 ダウンロード
               </button>
+              {selectedMaterial.fileType === 'pdf' && selectedMaterial.fileData && (
+                <button className="view-btn" onClick={() => viewPDF(selectedMaterial)}>
+                  <Eye size={16} />
+                  PDFプレビュー
+                </button>
+              )}
               <button className="cancel-btn" onClick={() => setSelectedMaterial(null)}>閉じる</button>
             </div>
           </div>

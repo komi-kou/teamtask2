@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Mail, Download, Search, Calendar, User, ExternalLink } from 'lucide-react';
+import { Plus, Mail, Download, Search, Calendar, User, ExternalLink, Edit2, Trash2 } from 'lucide-react';
 import { LocalStorage, STORAGE_KEYS } from '../utils/storage';
 import './SalesEmails.css';
 
@@ -23,6 +23,7 @@ const SalesEmails: React.FC = () => {
   const [emails, setEmails] = useState<SalesEmail[]>([]);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<SalesEmail | null>(null);
+  const [editingEmail, setEditingEmail] = useState<SalesEmail | null>(null);
   const [newEmail, setNewEmail] = useState<Partial<SalesEmail>>({
     emailType: 'inquiry',
     status: 'sent',
@@ -43,23 +44,49 @@ const SalesEmails: React.FC = () => {
 
   const addEmail = () => {
     if (newEmail.subject && newEmail.client) {
-      const email: SalesEmail = {
-        id: Date.now(),
-        subject: newEmail.subject,
-        content: newEmail.content || '',
-        client: newEmail.client,
-        contactPerson: newEmail.contactPerson || '',
-        emailType: newEmail.emailType as SalesEmail['emailType'],
-        sentDate: newEmail.sentDate || '',
-        receivedDate: newEmail.receivedDate || '',
-        status: newEmail.status as SalesEmail['status'],
-        attachments: newEmail.attachments || [],
-        tags: newEmail.tags || [],
-        notes: newEmail.notes || '',
-        createdAt: new Date().toISOString()
-      };
+      let updatedEmails;
       
-      const updatedEmails = [...emails, email];
+      if (editingEmail) {
+        // 編集モード
+        updatedEmails = emails.map(email => 
+          email.id === editingEmail.id 
+            ? {
+                ...editingEmail,
+                subject: newEmail.subject,
+                content: newEmail.content || '',
+                client: newEmail.client,
+                contactPerson: newEmail.contactPerson || '',
+                emailType: newEmail.emailType as SalesEmail['emailType'],
+                sentDate: newEmail.sentDate || '',
+                receivedDate: newEmail.receivedDate || '',
+                status: newEmail.status as SalesEmail['status'],
+                attachments: newEmail.attachments || [],
+                tags: newEmail.tags || [],
+                notes: newEmail.notes || ''
+              }
+            : email
+        );
+        setEditingEmail(null);
+      } else {
+        // 新規追加モード
+        const email: SalesEmail = {
+          id: Date.now(),
+          subject: newEmail.subject,
+          content: newEmail.content || '',
+          client: newEmail.client,
+          contactPerson: newEmail.contactPerson || '',
+          emailType: newEmail.emailType as SalesEmail['emailType'],
+          sentDate: newEmail.sentDate || '',
+          receivedDate: newEmail.receivedDate || '',
+          status: newEmail.status as SalesEmail['status'],
+          attachments: newEmail.attachments || [],
+          tags: newEmail.tags || [],
+          notes: newEmail.notes || '',
+          createdAt: new Date().toISOString()
+        };
+        updatedEmails = [...emails, email];
+      }
+      
       setEmails(updatedEmails);
       LocalStorage.set(STORAGE_KEYS.SALES_EMAILS, updatedEmails);
       
@@ -89,6 +116,34 @@ const SalesEmails: React.FC = () => {
       ...newEmail,
       tags: newEmail.tags?.filter(tag => tag !== tagToRemove) || []
     });
+  };
+
+  const editEmail = (email: SalesEmail) => {
+    setEditingEmail(email);
+    setNewEmail({
+      subject: email.subject,
+      content: email.content,
+      client: email.client,
+      contactPerson: email.contactPerson,
+      emailType: email.emailType,
+      sentDate: email.sentDate,
+      receivedDate: email.receivedDate,
+      status: email.status,
+      attachments: email.attachments,
+      tags: email.tags,
+      notes: email.notes,
+      createdAt: email.createdAt
+    });
+    setShowEmailModal(true);
+  };
+
+  const deleteEmail = (emailId: number) => {
+    const email = emails.find(e => e.id === emailId);
+    if (email && window.confirm(`「${email.subject}」のメールを削除してもよろしいですか？`)) {
+      const updatedEmails = emails.filter(e => e.id !== emailId);
+      setEmails(updatedEmails);
+      LocalStorage.set(STORAGE_KEYS.SALES_EMAILS, updatedEmails);
+    }
   };
 
   const getTypeColor = (type: string) => {
@@ -276,14 +331,47 @@ const SalesEmails: React.FC = () => {
                 <span className="attachment-count">📎 {email.attachments.length}個の添付ファイル</span>
               </div>
             )}
+            
+            <div className="email-actions">
+              <button 
+                className="edit-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  editEmail(email);
+                }}
+                title="編集"
+              >
+                <Edit2 size={16} />
+              </button>
+              <button 
+                className="delete-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteEmail(email.id);
+                }}
+                title="削除"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           </div>
         ))}
       </div>
 
       {showEmailModal && (
-        <div className="modal-overlay" onClick={() => setShowEmailModal(false)}>
+        <div className="modal-overlay" onClick={() => {
+          setShowEmailModal(false);
+          setEditingEmail(null);
+          setNewEmail({
+            emailType: 'inquiry',
+            status: 'sent',
+            attachments: [],
+            tags: [],
+            createdAt: new Date().toISOString()
+          });
+        }}>
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>営業メール追加</h2>
+            <h2>{editingEmail ? '営業メール編集' : '営業メール追加'}</h2>
             <div className="form-group">
               <label>件名 *</label>
               <input
@@ -393,8 +481,20 @@ const SalesEmails: React.FC = () => {
               />
             </div>
             <div className="modal-actions">
-              <button className="cancel-btn" onClick={() => setShowEmailModal(false)}>キャンセル</button>
-              <button className="save-btn" onClick={addEmail}>メールを追加</button>
+              <button className="cancel-btn" onClick={() => {
+                setShowEmailModal(false);
+                setEditingEmail(null);
+                setNewEmail({
+                  emailType: 'inquiry',
+                  status: 'sent',
+                  attachments: [],
+                  tags: [],
+                  createdAt: new Date().toISOString()
+                });
+              }}>キャンセル</button>
+              <button className="save-btn" onClick={addEmail}>
+                {editingEmail ? 'メールを更新' : 'メールを追加'}
+              </button>
             </div>
           </div>
         </div>
@@ -449,6 +549,24 @@ const SalesEmails: React.FC = () => {
               )}
             </div>
             <div className="modal-actions">
+              <button 
+                className="edit-btn"
+                onClick={() => {
+                  editEmail(selectedEmail);
+                  setSelectedEmail(null);
+                }}
+              >
+                編集
+              </button>
+              <button 
+                className="delete-btn"
+                onClick={() => {
+                  deleteEmail(selectedEmail.id);
+                  setSelectedEmail(null);
+                }}
+              >
+                削除
+              </button>
               <button className="cancel-btn" onClick={() => setSelectedEmail(null)}>閉じる</button>
             </div>
           </div>

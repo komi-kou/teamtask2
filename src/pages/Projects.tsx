@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Calendar, Users, DollarSign, Clock, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { Plus, Calendar, Users, DollarSign, Clock, CheckCircle, AlertCircle, ExternalLink, Edit2, Trash2 } from 'lucide-react';
 import { LocalStorage, STORAGE_KEYS } from '../utils/storage';
 import './Projects.css';
 
@@ -39,6 +39,7 @@ const Projects: React.FC = () => {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showDeliverableModal, setShowDeliverableModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [newProject, setNewProject] = useState<Partial<Project>>({
     status: 'planning',
     isActive: true,
@@ -66,26 +67,53 @@ const Projects: React.FC = () => {
 
   const addProject = () => {
     if (newProject.name && newProject.client && newProject.startDate) {
-      const project: Project = {
-        id: Date.now(),
-        name: newProject.name,
-        description: newProject.description || '',
-        client: newProject.client,
-        status: newProject.status as Project['status'],
-        isActive: newProject.isActive !== false,
-        priority: newProject.priority as Project['priority'],
-        startDate: newProject.startDate,
-        endDate: newProject.endDate || '',
-        budget: newProject.budget || 0,
-        teamMembers: newProject.teamMembers || [],
-        progress: newProject.progress || 0,
-        deliverables: newProject.deliverables || [],
-        notes: newProject.notes || '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
+      let updatedProjects;
       
-      const updatedProjects = [...projects, project];
+      if (editingProject) {
+        // 編集モード
+        updatedProjects = projects.map(project => 
+          project.id === editingProject.id 
+            ? {
+                ...editingProject,
+                name: newProject.name,
+                description: newProject.description || '',
+                client: newProject.client,
+                status: newProject.status as Project['status'],
+                isActive: newProject.isActive !== false,
+                priority: newProject.priority as Project['priority'],
+                startDate: newProject.startDate,
+                endDate: newProject.endDate || '',
+                budget: newProject.budget || 0,
+                teamMembers: newProject.teamMembers || [],
+                notes: newProject.notes || '',
+                updatedAt: new Date().toISOString()
+              }
+            : project
+        );
+        setEditingProject(null);
+      } else {
+        // 新規追加モード
+        const project: Project = {
+          id: Date.now(),
+          name: newProject.name,
+          description: newProject.description || '',
+          client: newProject.client,
+          status: newProject.status as Project['status'],
+          isActive: newProject.isActive !== false,
+          priority: newProject.priority as Project['priority'],
+          startDate: newProject.startDate,
+          endDate: newProject.endDate || '',
+          budget: newProject.budget || 0,
+          teamMembers: newProject.teamMembers || [],
+          progress: newProject.progress || 0,
+          deliverables: newProject.deliverables || [],
+          notes: newProject.notes || '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        updatedProjects = [...projects, project];
+      }
+      
       setProjects(updatedProjects);
       LocalStorage.set(STORAGE_KEYS.PROJECTS_DATA, updatedProjects);
       
@@ -157,6 +185,37 @@ const Projects: React.FC = () => {
     });
     setProjects(updatedProjects);
     LocalStorage.set(STORAGE_KEYS.PROJECTS_DATA, updatedProjects);
+  };
+
+  const editProject = (project: Project) => {
+    setEditingProject(project);
+    setNewProject({
+      name: project.name,
+      description: project.description,
+      client: project.client,
+      status: project.status,
+      isActive: project.isActive,
+      priority: project.priority,
+      startDate: project.startDate,
+      endDate: project.endDate,
+      budget: project.budget,
+      teamMembers: project.teamMembers,
+      progress: project.progress,
+      deliverables: project.deliverables,
+      notes: project.notes,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt
+    });
+    setShowProjectModal(true);
+  };
+
+  const deleteProject = (projectId: number) => {
+    const project = projects.find(p => p.id === projectId);
+    if (project && window.confirm(`「${project.name}」の案件を削除してもよろしいですか？`)) {
+      const updatedProjects = projects.filter(p => p.id !== projectId);
+      setProjects(updatedProjects);
+      LocalStorage.set(STORAGE_KEYS.PROJECTS_DATA, updatedProjects);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -372,15 +431,41 @@ const Projects: React.FC = () => {
                   {project.status === 'review' || project.status === 'in-progress' ? '完了にする' : '詳細表示'}
                 </button>
               )}
+              <button 
+                className="edit-btn"
+                onClick={() => editProject(project)}
+                title="編集"
+              >
+                <Edit2 size={16} />
+              </button>
+              <button 
+                className="delete-btn"
+                onClick={() => deleteProject(project.id)}
+                title="削除"
+              >
+                <Trash2 size={16} />
+              </button>
             </div>
           </div>
         ))}
       </div>
 
       {showProjectModal && (
-        <div className="modal-overlay" onClick={() => setShowProjectModal(false)}>
+        <div className="modal-overlay" onClick={() => {
+          setShowProjectModal(false);
+          setEditingProject(null);
+          setNewProject({
+            status: 'planning',
+            isActive: true,
+            priority: 'medium',
+            progress: 0,
+            deliverables: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+        }}>
           <div className="modal-content large-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>新規案件追加</h2>
+            <h2>{editingProject ? '案件情報編集' : '新規案件追加'}</h2>
             <div className="form-row">
               <div className="form-group">
                 <label>案件名 *</label>
@@ -507,8 +592,22 @@ const Projects: React.FC = () => {
               />
             </div>
             <div className="modal-actions">
-              <button className="cancel-btn" onClick={() => setShowProjectModal(false)}>キャンセル</button>
-              <button className="save-btn" onClick={addProject}>案件を追加</button>
+              <button className="cancel-btn" onClick={() => {
+                setShowProjectModal(false);
+                setEditingProject(null);
+                setNewProject({
+                  status: 'planning',
+                  isActive: true,
+                  priority: 'medium',
+                  progress: 0,
+                  deliverables: [],
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                });
+              }}>キャンセル</button>
+              <button className="save-btn" onClick={addProject}>
+                {editingProject ? '案件情報を更新' : '案件を追加'}
+              </button>
             </div>
           </div>
         </div>
