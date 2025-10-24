@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { LocalStorage, STORAGE_KEYS } from '../utils/storage';
-import { Plus, Users, Calendar, FileText, CheckCircle, Link } from 'lucide-react';
+import { Plus, Users, Calendar, FileText, CheckCircle, Link, Edit2, Trash2 } from 'lucide-react';
 import './Dashboard.css';
 
 interface TeamMember {
@@ -51,6 +51,7 @@ const Dashboard: React.FC = () => {
   const [showSalesModal, setShowSalesModal] = useState(false);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [newSales, setNewSales] = useState({ month: '', sales: 0, target: 0 });
   const [newMember, setNewMember] = useState<{ name: string; role: string; status: 'online' | 'offline' | 'away' }>({ name: '', role: '', status: 'offline' });
   const [newMeeting, setNewMeeting] = useState({ title: '', date: '', time: '', link: '', attendees: '' });
@@ -60,6 +61,7 @@ const Dashboard: React.FC = () => {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
 
   useEffect(() => {
     const savedSales = LocalStorage.get<SalesRecord[]>(STORAGE_KEYS.SALES_DATA);
@@ -67,6 +69,7 @@ const Dashboard: React.FC = () => {
     const savedMeetings = LocalStorage.get<Meeting[]>(STORAGE_KEYS.MEETINGS);
     const savedActivities = LocalStorage.get<Activity[]>(STORAGE_KEYS.ACTIVITIES);
     const savedProjects = LocalStorage.get<Project[]>(STORAGE_KEYS.PROJECTS_DATA);
+    const savedTasks = LocalStorage.get<any[]>(STORAGE_KEYS.TASKS_DATA);
     
     if (savedProjects && savedProjects.length > 0) {
       setProjects(savedProjects);
@@ -88,6 +91,9 @@ const Dashboard: React.FC = () => {
     }
     if (savedActivities && savedActivities.length > 0) {
       setActivities(savedActivities);
+    }
+    if (savedTasks && savedTasks.length > 0) {
+      setTasks(savedTasks);
     }
   }, []);
 
@@ -142,27 +148,86 @@ const Dashboard: React.FC = () => {
   };
 
   const addTeamMember = () => {
-    if (newMember.name && newMember.role) {
-      const member: TeamMember = {
-        id: Date.now(),
-        name: newMember.name,
-        role: newMember.role,
-        status: newMember.status
-      };
-      const updatedMembers = [...teamMembers, member];
+    if (editingMember) {
+      // 編集モード
+      const updatedMembers = teamMembers.map(m => 
+        m.id === editingMember.id 
+          ? { ...editingMember, name: newMember.name, role: newMember.role, status: newMember.status }
+          : m
+      );
       setTeamMembers(updatedMembers);
       LocalStorage.set(STORAGE_KEYS.TEAM_MEMBERS, updatedMembers);
-      setNewMember({ name: '', role: '', status: 'offline' });
-      setShowMemberModal(false);
       
       // アクティビティに追加
       const activity: Activity = {
         id: Date.now(),
         type: 'task',
-        title: `チームメンバー「${newMember.name}」を追加`,
+        title: `チームメンバー「${newMember.name}」を更新`,
         user: 'システム',
         timestamp: new Date().toLocaleString('ja-JP'),
         description: `役職: ${newMember.role}`
+      };
+      const updatedActivities = [activity, ...activities.slice(0, 9)];
+      setActivities(updatedActivities);
+      LocalStorage.set(STORAGE_KEYS.ACTIVITIES, updatedActivities);
+      
+      setEditingMember(null);
+    } else {
+      // 新規追加モード
+      if (newMember.name && newMember.role) {
+        const member: TeamMember = {
+          id: Date.now(),
+          name: newMember.name,
+          role: newMember.role,
+          status: newMember.status
+        };
+        const updatedMembers = [...teamMembers, member];
+        setTeamMembers(updatedMembers);
+        LocalStorage.set(STORAGE_KEYS.TEAM_MEMBERS, updatedMembers);
+        
+        // アクティビティに追加
+        const activity: Activity = {
+          id: Date.now(),
+          type: 'task',
+          title: `チームメンバー「${member.name}」を追加`,
+          user: 'システム',
+          timestamp: new Date().toLocaleString('ja-JP'),
+          description: `役職: ${member.role}`
+        };
+        const updatedActivities = [activity, ...activities.slice(0, 9)];
+        setActivities(updatedActivities);
+        LocalStorage.set(STORAGE_KEYS.ACTIVITIES, updatedActivities);
+      }
+    }
+    
+    setNewMember({ name: '', role: '', status: 'offline' });
+    setShowMemberModal(false);
+  };
+
+  const editMember = (member: TeamMember) => {
+    setEditingMember(member);
+    setNewMember({
+      name: member.name,
+      role: member.role,
+      status: member.status
+    });
+    setShowMemberModal(true);
+  };
+
+  const deleteMember = (memberId: number) => {
+    const member = teamMembers.find(m => m.id === memberId);
+    if (member && window.confirm(`${member.name}を削除してもよろしいですか？`)) {
+      const updatedMembers = teamMembers.filter(m => m.id !== memberId);
+      setTeamMembers(updatedMembers);
+      LocalStorage.set(STORAGE_KEYS.TEAM_MEMBERS, updatedMembers);
+      
+      // アクティビティに追加
+      const activity: Activity = {
+        id: Date.now(),
+        type: 'task',
+        title: `チームメンバー「${member.name}」を削除`,
+        user: 'システム',
+        timestamp: new Date().toLocaleString('ja-JP')
       };
       const updatedActivities = [activity, ...activities.slice(0, 9)];
       setActivities(updatedActivities);
@@ -225,8 +290,10 @@ const Dashboard: React.FC = () => {
   const previousMonthSales = previousMonthProjects.reduce((sum, p) => sum + (p.actualRevenue || p.budget), 0);
   const salesGrowth = previousMonthSales > 0 ? ((currentMonthSales - previousMonthSales) / previousMonthSales * 100) : 0;
   
-  const totalTasks = teamMembers.length * 5; // 仮の計算（実際はタスクデータから取得）
-  const activeTasks = Math.floor(totalTasks * 0.3);
+  // タスクデータから実際の数を取得
+  const totalTasks = tasks.length;
+  const activeTasks = tasks.filter((task: any) => task.status === 'in-progress' || task.status === 'review').length;
+  const completedTasks = tasks.filter((task: any) => task.status === 'done').length;
   
   const thisWeekMeetings = meetings.filter(m => {
     const meetingDate = new Date(m.date);
@@ -264,9 +331,9 @@ const Dashboard: React.FC = () => {
           <p className="stat-hint">※案件管理から自動集計</p>
         </div>
         <div className="stat-card">
-          <h3>アクティブタスク</h3>
-          <p className="stat-value">{totalTasks}</p>
-          <p className="stat-detail">{activeTasks}件が進行中</p>
+          <h3>タスク状況</h3>
+          <p className="stat-value">{totalTasks}件</p>
+          <p className="stat-detail">進行中: {activeTasks}件 / 完了: {completedTasks}件</p>
         </div>
         <div className="stat-card">
           <h3>今週の会議</h3>
@@ -310,8 +377,30 @@ const Dashboard: React.FC = () => {
                   {teamMembers.map(member => (
                     <div key={member.id} className="member-item">
                       <div className="member-info">
-                        <h4>{member.name}</h4>
-                        <p>{member.role}</p>
+                        <div className="member-details">
+                          <h4>{member.name}</h4>
+                          <p>{member.role}</p>
+                          <span className={`status-badge ${member.status}`}>
+                            {member.status === 'online' ? 'オンライン' : 
+                             member.status === 'away' ? '離席中' : 'オフライン'}
+                          </span>
+                        </div>
+                        <div className="member-actions">
+                          <button 
+                            className="edit-btn" 
+                            onClick={() => editMember(member)}
+                            title="編集"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            className="delete-btn" 
+                            onClick={() => deleteMember(member.id)}
+                            title="削除"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -414,9 +503,13 @@ const Dashboard: React.FC = () => {
       )}
 
       {showMemberModal && (
-        <div className="modal-overlay" onClick={() => setShowMemberModal(false)}>
+        <div className="modal-overlay" onClick={() => {
+          setShowMemberModal(false);
+          setEditingMember(null);
+          setNewMember({ name: '', role: '', status: 'offline' });
+        }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>チームメンバーを追加</h2>
+            <h2>{editingMember ? 'チームメンバーを編集' : 'チームメンバーを追加'}</h2>
             <div className="form-group">
               <label>名前</label>
               <input
@@ -447,8 +540,14 @@ const Dashboard: React.FC = () => {
               </select>
             </div>
             <div className="modal-actions">
-              <button className="cancel-btn" onClick={() => setShowMemberModal(false)}>キャンセル</button>
-              <button className="save-btn" onClick={addTeamMember}>追加</button>
+              <button className="cancel-btn" onClick={() => {
+                setShowMemberModal(false);
+                setEditingMember(null);
+                setNewMember({ name: '', role: '', status: 'offline' });
+              }}>キャンセル</button>
+              <button className="save-btn" onClick={addTeamMember}>
+                {editingMember ? '更新' : '追加'}
+              </button>
             </div>
           </div>
         </div>

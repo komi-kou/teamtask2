@@ -3,6 +3,101 @@
   margin: 0 auto;
 }
 
+/* チームメンバー管理スタイル */
+.team-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.member-item {
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  transition: background 0.3s;
+}
+
+.member-item:hover {
+  background: #f0f0f0;
+}
+
+.member-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.member-details {
+  flex: 1;
+}
+
+.member-details h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.member-details p {
+  margin: 5px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  margin-top: 5px;
+}
+
+.status-badge.online {
+  background: #4CAF50;
+  color: white;
+}
+
+.status-badge.offline {
+  background: #999;
+  color: white;
+}
+
+.status-badge.away {
+  background: #FF9800;
+  color: white;
+}
+
+.member-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-btn, .delete-btn {
+  background: none;
+  border: 1px solid #ddd;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-btn:hover {
+  background: #2196F3;
+  border-color: #2196F3;
+  color: white;
+}
+
+.delete-btn:hover {
+  background: #f44336;
+  border-color: #f44336;
+  color: white;
+}
+
 .dashboard h1 {
   margin-bottom: 30px;
   color: #2c3e50;
